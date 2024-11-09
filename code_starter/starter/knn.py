@@ -102,6 +102,17 @@ def main():
 
     print(f"Test accuracy with {strategy} k={best_k}: {test_accuracy:.4f}")
 
+    plt.figure(figsize=(10, 6))
+    plt.plot(k_values, valid_acc_user, label='User-based Imputation')
+    plt.plot(k_values, valid_acc_item, label='Item-based Imputation')
+    plt.xlabel('Number of Neighbors (k)')
+    plt.ylabel('Validation Accuracy')
+    plt.title('k-NN Imputation Performance')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    plt.savefig('knn_imputation.png')
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
