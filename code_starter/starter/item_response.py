@@ -23,24 +23,18 @@ def neg_log_likelihood(data, theta, beta):
     :param beta: Vector
     :return: float
     """
-    #####################################################################
-    # TODO:                                                             #
-    # Implement the function as described in the docstring.             #
-    #####################################################################
     log_lklihood = 0.0
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
+    for i in range(len(data["is_correct"])):
+        u = data["user_id"][i]
+        q = data["question_id"][i]
+        c = data["is_correct"][i]
+        x = theta[u] - beta[q]
+        log_lklihood += c * np.log(sigmoid(x)) + (1 - c) * np.log(1 - sigmoid(x))
     return -log_lklihood
 
 
 def update_theta_beta(data, lr, theta, beta):
     """Update theta and beta using gradient descent.
-
-    You are using alternating gradient descent. Your update should look:
-    for i in iterations ...
-        theta <- new_theta
-        beta <- new_beta
 
     You may optionally replace the function arguments to receive a matrix.
 
@@ -51,14 +45,22 @@ def update_theta_beta(data, lr, theta, beta):
     :param beta: Vector
     :return: tuple of vectors
     """
-    #####################################################################
-    # TODO:                                                             #
-    # Implement the function as described in the docstring.             #
-    #####################################################################
-    pass
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
+    d_theta = np.zeros_like(theta)
+    d_beta = np.zeros_like(beta)
+
+    for i in range(len(data["is_correct"])):
+        u = data["user_id"][i]
+        q = data["question_id"][i]
+        c = data["is_correct"][i]
+        x = theta[u] - beta[q]
+        p = sigmoid(x)
+
+        d_theta[u] += c - p
+        d_beta[q] += p - c
+
+    theta += lr * d_theta
+    beta -= lr * d_beta
+
     return theta, beta
 
 
@@ -75,9 +77,10 @@ def irt(data, val_data, lr, iterations):
     :param iterations: int
     :return: (theta, beta, val_acc_lst)
     """
-    # TODO: Initialize theta and beta.
-    theta = None
-    beta = None
+    num_users = max(data["user_id"]) + 1
+    num_questions = max(data["question_id"]) + 1
+    theta = np.zeros(num_users)
+    beta = np.zeros(num_questions)
 
     val_acc_lst = []
 
