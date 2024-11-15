@@ -50,20 +50,16 @@ def update_theta_beta(data, lr, theta, beta):
     """
     d_theta = np.zeros_like(theta)
     d_beta = np.zeros_like(beta)
-
     for i in range(len(data["is_correct"])):
         u = data["user_id"][i]
         q = data["question_id"][i]
         c = data["is_correct"][i]
         x = theta[u] - beta[q]
         p = sigmoid(x)
-
         d_theta[u] += c - p
         d_beta[q] += p - c
-
     theta += lr * d_theta
-    beta -= lr * d_beta
-
+    beta += lr * d_beta
     return theta, beta
 
 
@@ -128,7 +124,6 @@ def main():
     # sparse_matrix = load_train_sparse("./data")
     val_data = load_valid_csv("./data")
     test_data = load_public_test_csv("./data")
-
 
     #####################################################################
     # TODO:                                                             #
