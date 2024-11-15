@@ -1,3 +1,6 @@
+from nltk import log_likelihood
+
+from code_starter.starter.neural_network import train
 from utils import (
     load_train_csv,
     load_valid_csv,
@@ -29,7 +32,7 @@ def neg_log_likelihood(data, theta, beta):
         q = data["question_id"][i]
         c = data["is_correct"][i]
         x = theta[u] - beta[q]
-        log_lklihood += c * np.log(sigmoid(x)) + (1 - c) * np.log(1 - sigmoid(x))
+        log_lklihood += c * np.log(sigmoid(x) + 1e-9) + (1 - c) * np.log(1 - sigmoid(x) + 1e-9)
     return -log_lklihood
 
 
@@ -83,16 +86,22 @@ def irt(data, val_data, lr, iterations):
     beta = np.zeros(num_questions)
 
     val_acc_lst = []
-
+    val_llds = []
+    train_llds = []
     for i in range(iterations):
-        neg_lld = neg_log_likelihood(data, theta=theta, beta=beta)
+        neg_lld_val = neg_log_likelihood(data, theta=theta, beta=beta)
+        train_llds.append(neg_lld_val)
+
+        neg_lld = neg_log_likelihood(val_data, theta=theta, beta=beta)
+        val_llds.append(neg_lld)
+
         score = evaluate(data=val_data, theta=theta, beta=beta)
         val_acc_lst.append(score)
-        print("NLLK: {} \t Score: {}".format(neg_lld, score))
         theta, beta = update_theta_beta(data, lr, theta, beta)
 
+    log_likelihoods = {"train": train_llds, "val": val_llds}
     # TODO: You may change the return values to achieve what you want.
-    return theta, beta, val_acc_lst
+    return theta, beta, val_acc_lst, log_likelihoods
 
 
 def evaluate(data, theta, beta):
@@ -120,12 +129,35 @@ def main():
     val_data = load_valid_csv("./data")
     test_data = load_public_test_csv("./data")
 
+
     #####################################################################
     # TODO:                                                             #
     # Tune learning rate and number of iterations. With the implemented #
     # code, report the validation and test accuracy.                    #
     #####################################################################
-    pass
+    learning_rates = [0.001, 0.005, 0.01, 0.05]
+    iteration_counts = [10, 50, 100]
+
+    best_lr = None
+    best_iterations = None
+    best_val_acc = None
+    best_theta = None
+    best_beta = None
+    for lr in learning_rates:
+        for iteration in iteration_counts:
+            theta, beta, val_acc_lst, log_likelihoods = irt(train_data, val_data, lr, iteration)
+            val_acc = evaluate(val_data, theta, beta)
+            test_acc = evaluate(test_data, theta, beta)
+            print(f"Learning Rate: {lr} Iteration: {iteration} Val Acc: {val_acc} Test Acc: {test_acc}")
+            if best_val_acc is None or val_acc > best_val_acc:
+                best_lr = lr
+                best_iterations = iteration
+                best_val_acc = val_acc
+                best_theta = theta
+                best_beta = beta
+    print("\nBest Hyperparameters:")
+    print(f"Learning Rate: {best_lr}")
+    print(f"Iterations: {best_iterations}")
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
