@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
 import torch
-
+import matplotlib.pyplot as plt
 from utils import (
     load_valid_csv,
     load_public_test_csv,
@@ -105,6 +105,9 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     # Define optimizers and loss function.
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
+    train_losses = []
+    train_accs = []
+    valid_accs = []
 
     for epoch in range(0, num_epoch):
         train_loss = 0.0
@@ -127,11 +130,22 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             optimizer.step()
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
+        train_acc = evaluate(model, zero_train_data, train_data)
+
         print(
             "Epoch: {} \tTraining Cost: {:.6f}\t " "Valid Acc: {}".format(
                 epoch, train_loss, valid_acc
             )
         )
+        train_losses.append(train_loss)
+        train_accs.append(train_acc)
+        valid_accs.append(valid_acc)
+
+
+    return train_losses, valid_accs, train_accs
+
+
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -153,7 +167,7 @@ def evaluate(model, train_data, valid_data):
     correct = 0
 
     for i, u in enumerate(valid_data["user_id"]):
-        inputs = Variable(train_data[u]).unsqueeze(0)
+        inputs = train_data[u].unsqueeze(0)
         output = model(inputs)
 
         guess = output[0][valid_data["question_id"][i]].item() >= 0.5
@@ -171,58 +185,63 @@ def main():
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
     #####################################################################
-    # Set model hyperparameters.
-    k = [10,50,100,200,500]
+    # Define model hyperparameters.
+    k_values = [10, 50, 100, 200, 500]
     num_questions = zero_train_matrix.shape[1]
 
-    # Set optimization hyperparameters.
+    # Define optimization hyperparameters.
     lr = 0.01
     num_epoch = 50
     lamb = 0.01
 
-    # Record best hyper
-    best_k = 0
-    best_lr = 0
-    best_num_epoch = 0
-    best_lamb = 0
-    best_valid_acc = 0
+    # Initialize variables to track the best hyperparameters.
+    best_k = None
+    best_lambda = None
+    best_valid_acc = 0.0
 
-    for i in k:
+    # Iterate over different k values to find the best one.
+    for k in k_values:
+        print(f"\nTraining AutoEncoder with k={k}, lambda={lamb}")
 
-        #Initalize the model
-        model = AutoEncoder(num_questions, i)
+        # Initialize the model.
+        model = AutoEncoder(num_question=num_questions, k=k)
 
-        train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
-        # Next, evaluate your network on validation/test data
-        valid_acc = evaluate(model, zero_train_matrix, valid_data)
-        print(f"Validation Accuracy for k={i}, lambda={lamb}: {valid_acc:.4f}")
+        # Train the model and capture all metrics.
+        training_losses, validation_accuracies, training_accuracies = train(
+            model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch
+        )
 
-        # Update the best hyperparameters if current model is better
-        if valid_acc > best_valid_acc:
-            best_valid_acc = valid_acc
-            best_k = i
+        # Obtain the final validation accuracy.
+        final_valid_acc = validation_accuracies[-1]
+        print(f"Final Validation Accuracy for k={k}, lambda={lamb}: {final_valid_acc:.4f}")
+
+        # Update the best hyperparameters if current model is better.
+        if final_valid_acc > best_valid_acc:
+            best_valid_acc = final_valid_acc
+            best_k = k
             best_lambda = lamb
 
-        # Part (d): Retrain the best model and record metrics for plotting
-    print(
-        f"\nRetraining the best model with k*={best_k} and lambda*={best_lambda} for plotting metrics...")
+    print(f"\nBest Hyperparameters:\nk*={best_k}, lambda*={best_lambda} with Validation Accuracy={best_valid_acc:.4f}")
 
-    # Initialize the best model
+    #####################################################################
+    #                       END OF YOUR CODE                            #
+    #####################################################################
+
+    # Part (d): Retrain the best model to collect metrics for plotting.
+    print(f"\nRetraining the best model with k*={best_k}, lambda*={best_lambda} for plotting metrics...")
+
+    # Initialize the best model.
     best_model = AutoEncoder(num_question=num_questions, k=best_k)
 
-    # Optionally, initialize weights (already done in AutoEncoder class)
-    # nn.init.xavier_uniform_(best_model.g.weight)
-    # nn.init.xavier_uniform_(best_model.h.weight)
+    # Train the best model and capture all metrics.
+    training_losses, validation_accuracies, training_accuracies = train(
+        best_model, lr, best_lambda, train_matrix, zero_train_matrix, valid_data, num_epoch
+    )
 
-    # Train the best model and record metrics
-    training_losses, validation_accuracies = train(best_model, lr, best_lambda,
-                                                   train_matrix,
-                                                   zero_train_matrix,
-                                                   valid_data, num_epoch)
-
-    # Plot training loss and validation accuracy over epochs
+    # Generate epochs range for plotting.
     epochs = range(1, num_epoch + 1)
 
+    # Plot Training Loss and Validation Accuracy over Epochs.
     plt.figure(figsize=(12, 5))
 
     # Plot Training Loss
@@ -236,8 +255,7 @@ def main():
 
     # Plot Validation Accuracy
     plt.subplot(1, 2, 2)
-    plt.plot(epochs, validation_accuracies, label='Validation Accuracy',
-             color='green')
+    plt.plot(epochs, validation_accuracies, label='Validation Accuracy', color='green')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.title('Validation Accuracy over Epochs')
@@ -247,13 +265,10 @@ def main():
     plt.tight_layout()
     plt.show()
 
-    # Evaluate the best model on the test set
+    # Evaluate the best model on the test set.
     test_acc = evaluate(best_model, zero_train_matrix, test_data)
-    print(
-        f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lambda}): {test_acc:.4f}")
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
+    print(f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lambda}): {test_acc:.4f}")
+
 
 
 if __name__ == "__main__":
