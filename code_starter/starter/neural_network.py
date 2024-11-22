@@ -110,7 +110,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
         train_loss = 0.0
 
         for user_id in range(num_student):
-            inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
+            inputs = zero_train_data[user_id].unsqueeze(0)
             target = inputs.clone()
 
             optimizer.zero_grad()
@@ -120,7 +120,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[nan_mask] = output[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.0) + lamb * regular
+            loss = torch.sum((output - target) ** 2.0) #+ lamb * regular
             loss.backward()
 
             train_loss += loss.item()
@@ -177,7 +177,7 @@ def main():
 
     # Set optimization hyperparameters.
     lr = 0.01
-    num_epoch = 10
+    num_epoch = 50
     lamb = 0.01
 
     # Record best hyper
