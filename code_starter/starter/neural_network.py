@@ -74,10 +74,14 @@ class AutoEncoder(nn.Module):
         # Use sigmoid activations for f and g.                              #
         #####################################################################
         out = inputs
+        inner = self.g(out)
+        sinner = torch.sigmoid(inner)
+        outer = self.h(sinner)
+        souter = torch.sigmoid(outer)
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
-        return out
+        return souter
 
 
 def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
@@ -94,7 +98,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :return: None
     """
     # TODO: Add a regularizer to the cost function.
-
+    regular = model.get_weight_norm()
     # Tell PyTorch you are training the model.
     model.train()
 
@@ -116,7 +120,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[nan_mask] = output[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.0)
+            loss = torch.sum((output - target) ** 2.0) + lamb * regular
             loss.backward()
 
             train_loss += loss.item()
@@ -168,16 +172,29 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k = None
-    model = None
+    k = [10,50,100,200,500]
+    num_questions = zero_train_matrix.shape[1]
 
     # Set optimization hyperparameters.
-    lr = None
-    num_epoch = None
-    lamb = None
+    lr = 0.01
+    num_epoch = 10
+    lamb = 0.01
 
-    train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
-    # Next, evaluate your network on validation/test data
+    # Record best hyper
+    best_k = 0
+    best_lr = 0
+    best_num_epoch = 0
+    best_lamb = 0
+
+    for i in k:
+
+        #Initalize the model
+        model = AutoEncoder(num_questions, i)
+
+        train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
+        # Next, evaluate your network on validation/test data
+        valid_acc = evaluate(model, zero_train_matrix, valid_data)
+        print(f"Validation Accuracy for k={i}, lambda={lamb}: {valid_acc:.4f}")
 
     #####################################################################
     #                       END OF YOUR CODE                            #
