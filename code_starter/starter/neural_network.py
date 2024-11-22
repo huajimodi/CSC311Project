@@ -185,6 +185,7 @@ def main():
     best_lr = 0
     best_num_epoch = 0
     best_lamb = 0
+    best_valid_acc = 0
 
     for i in k:
 
@@ -196,6 +197,60 @@ def main():
         valid_acc = evaluate(model, zero_train_matrix, valid_data)
         print(f"Validation Accuracy for k={i}, lambda={lamb}: {valid_acc:.4f}")
 
+        # Update the best hyperparameters if current model is better
+        if valid_acc > best_valid_acc:
+            best_valid_acc = valid_acc
+            best_k = i
+            best_lambda = lamb
+
+        # Part (d): Retrain the best model and record metrics for plotting
+    print(
+        f"\nRetraining the best model with k*={best_k} and lambda*={best_lambda} for plotting metrics...")
+
+    # Initialize the best model
+    best_model = AutoEncoder(num_question=num_questions, k=best_k)
+
+    # Optionally, initialize weights (already done in AutoEncoder class)
+    # nn.init.xavier_uniform_(best_model.g.weight)
+    # nn.init.xavier_uniform_(best_model.h.weight)
+
+    # Train the best model and record metrics
+    training_losses, validation_accuracies = train(best_model, lr, best_lambda,
+                                                   train_matrix,
+                                                   zero_train_matrix,
+                                                   valid_data, num_epoch)
+
+    # Plot training loss and validation accuracy over epochs
+    epochs = range(1, num_epoch + 1)
+
+    plt.figure(figsize=(12, 5))
+
+    # Plot Training Loss
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, training_losses, label='Training Loss', color='blue')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss over Epochs')
+    plt.legend()
+    plt.grid(True)
+
+    # Plot Validation Accuracy
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, validation_accuracies, label='Validation Accuracy',
+             color='green')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Validation Accuracy over Epochs')
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+    # Evaluate the best model on the test set
+    test_acc = evaluate(best_model, zero_train_matrix, test_data)
+    print(
+        f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lambda}): {test_acc:.4f}")
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
