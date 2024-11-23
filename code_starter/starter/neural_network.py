@@ -12,7 +12,14 @@ from utils import (
     load_train_sparse,
 )
 
-
+file_path = "C:/CSC311/CSC311Project/code_starter/starter/data/train_sparse.npz"
+try:
+    data = np.load(file_path)
+    print("File loaded successfully!")
+except FileNotFoundError:
+    print("File not found!")
+except Exception as e:
+    print(f"An error occurred: {e}")
 def load_data(base_path="./data"):
     """Load the data in PyTorch Tensor.
 
@@ -26,6 +33,7 @@ def load_data(base_path="./data"):
         test_data: A dictionary {user_id: list,
         user_id: list, is_correct: list}
     """
+    base_path="C:/CSC311/CSC311Project/code_starter/starter/data"
     train_matrix = load_train_sparse(base_path).toarray()
     valid_data = load_valid_csv(base_path)
     test_data = load_public_test_csv(base_path)
@@ -136,6 +144,87 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     #                       END OF YOUR CODE                            #
     #####################################################################
 
+def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+    """Train the neural network, where the objective also includes
+    a regularizer.
+
+    :param model: Module
+    :param lr: float
+    :param lamb: float
+    :param train_data: 2D FloatTensor
+    :param zero_train_data: 2D FloatTensor
+    :param valid_data: Dict
+    :param num_epoch: int
+    :return: tuple of (training_losses, validation_losses, training_accuracies, validation_accuracies)
+    """
+    # TODO: Add a regularizer to the cost function.
+    regular = model.get_weight_norm()
+    # Tell PyTorch you are training the model.
+    model.train()
+
+    # Define optimizers and loss function.
+    optimizer = optim.SGD(model.parameters(), lr=lr)
+    num_student = train_data.shape[0]
+
+    # Lists to store metrics
+    training_losses = []
+    validation_losses = []
+    training_accuracies = []
+    validation_accuracies = []
+
+    for epoch in range(0, num_epoch):
+        train_loss = 0.0
+        correct_preds = 0
+        total_preds = 0
+
+        for user_id in range(num_student):
+            inputs = zero_train_data[user_id].unsqueeze(0)
+            target = inputs.clone()
+
+            optimizer.zero_grad()
+            output = model(inputs)
+
+            # Mask the target to only compute the gradient of valid entries.
+            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
+            target[nan_mask] = output[nan_mask]
+
+            loss = torch.sum((output - target) ** 2.0) #+ lamb * regular
+            loss.backward()
+
+            train_loss += loss.item()
+            optimizer.step()
+
+            # Calculate training accuracy for valid entries
+            predicted = (output >= 0.5).float()
+            valid_entries = ~torch.tensor(nan_mask)
+            correct_preds += torch.sum(predicted[valid_entries] == target[valid_entries]).item()
+            total_preds += torch.sum(valid_entries).item()
+
+        # Compute training accuracy for this epoch
+        train_acc = correct_preds / total_preds
+
+        # Compute validation accuracy and loss
+        valid_acc = evaluate(model, zero_train_data, valid_data)
+        valid_loss = 0.0
+        for i, u in enumerate(valid_data["user_id"]):
+            inputs = zero_train_data[u].unsqueeze(0)
+            target = torch.FloatTensor([valid_data["is_correct"][i]])
+            output = model(inputs)
+            valid_loss += torch.sum((output[0][valid_data["question_id"][i]] - target) ** 2.0).item()
+
+        # Append metrics
+        training_losses.append(train_loss)
+        training_accuracies.append(train_acc)
+        validation_losses.append(valid_loss)
+        validation_accuracies.append(valid_acc)
+
+        # Print metrics
+        print(
+            f"Epoch: {epoch} \tTraining Loss: {train_loss:.6f}\t "
+            f"Training Acc: {train_acc:.4f}\tValidation Loss: {valid_loss:.6f}\tValidation Acc: {valid_acc:.4f}"
+        )
+
+    return training_losses, validation_losses, training_accuracies, validation_accuracies
 
 def evaluate(model, train_data, valid_data):
     """Evaluate the valid_data on the current model.
@@ -172,12 +261,13 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k = [10,50,100,200,500]
+    #k = [10,50,100,200,500]
+    k = [50]
     num_questions = zero_train_matrix.shape[1]
 
     # Set optimization hyperparameters.
-    lr = 0.01
-    num_epoch = 50
+    lr = 0.005
+    num_epoch = 80
     lamb = 0.01
 
     # Record best hyper
@@ -192,7 +282,7 @@ def main():
         #Initalize the model
         model = AutoEncoder(num_questions, i)
 
-        train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
+        train_s(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
         # Next, evaluate your network on validation/test data
         valid_acc = evaluate(model, zero_train_matrix, valid_data)
         print(f"Validation Accuracy for k={i}, lambda={lamb}: {valid_acc:.4f}")
@@ -215,18 +305,18 @@ def main():
     # nn.init.xavier_uniform_(best_model.h.weight)
 
     # Train the best model and record metrics
-    training_losses, validation_accuracies = train(best_model, lr, best_lambda,
+    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(best_model, lr, best_lambda,
                                                    train_matrix,
                                                    zero_train_matrix,
                                                    valid_data, num_epoch)
 
-    # Plot training loss and validation accuracy over epochs
+# Plot training loss, validation loss, training accuracy, and validation accuracy over epochs
     epochs = range(1, num_epoch + 1)
 
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(18, 10))
 
     # Plot Training Loss
-    plt.subplot(1, 2, 1)
+    plt.subplot(2, 2, 1)
     plt.plot(epochs, training_losses, label='Training Loss', color='blue')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
@@ -234,10 +324,27 @@ def main():
     plt.legend()
     plt.grid(True)
 
+    # Plot Validation Loss
+    plt.subplot(2, 2, 1)
+    plt.plot(epochs, validation_losses, label='Validation Loss', color='red')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Validation Loss over Epochs')
+    plt.legend()
+    plt.grid(True)
+
+    # Plot Training Accuracy
+    plt.subplot(2, 2, 3)
+    plt.plot(epochs, training_accuracies, label='Training Accuracy', color='orange')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Training Accuracy over Epochs')
+    plt.legend()
+    plt.grid(True)
+
     # Plot Validation Accuracy
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, validation_accuracies, label='Validation Accuracy',
-             color='green')
+    plt.subplot(2, 2, 3)
+    plt.plot(epochs, validation_accuracies, label='Validation Accuracy', color='green')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.title('Validation Accuracy over Epochs')
