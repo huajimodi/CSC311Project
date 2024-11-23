@@ -1,8 +1,11 @@
+import random
+
 import numpy as np
 from torch.autograd import Variable
 import torch.utils.data
 import torch
 import torch.optim as optim
+import torch.nn as nn
 
 from neural_network import AutoEncoder
 from utils import (
@@ -39,12 +42,6 @@ def load_data(base_path="./data"):
     return zero_train_matrix, train_matrix, valid_data, test_data
 
 def bootstrap_data(data, num_bootstrap):
-    """Return a list of bootstrap indices.
-
-    :param data: 2D FloatTensor
-    :param num_bootstrap: int
-    :return: List
-    """
     num_data = data.shape[0]
     bootstrap_indices = []
     for _ in range(num_bootstrap):
@@ -54,15 +51,6 @@ def bootstrap_data(data, num_bootstrap):
 
 
 def evaluate(model, train_data, valid_data):
-    """Evaluate the valid_data on the current model.
-
-    :param model: Module
-    :param train_data: 2D FloatTensor
-    :param valid_data: A dictionary {user_id: list,
-    question_id: list, is_correct: list}
-    :return: float
-    """
-    # Tell PyTorch you are evaluating the model.
     model.eval()
 
     total = 0
@@ -83,12 +71,11 @@ def aggregate_predictions(models, data):
     for model in models:
         model.eval()
         with torch.no_grad():
-            for user_id in range(data.shape[0]):
-                inputs = data[user_id].unsqueeze(0)
-                output = model(inputs)
-                aggregated_output[user_id] += output.squeeze(0)
+            output = model(data)
+            aggregated_output += output
     aggregated_output /= len(models)
     return aggregated_output
+
 
 def evaluate_aggregated(aggregated_output, data):
     total = 0
@@ -99,6 +86,7 @@ def evaluate_aggregated(aggregated_output, data):
             correct += 1
         total += 1
     return correct / float(total)
+
 
 def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     # Define optimizers and loss function.
@@ -129,9 +117,9 @@ def main():
     k = 50
     num_questions = zero_train_matrix.shape[1]
     lr = 0.005
-    num_epoch = 50
+    num_epoch = 80
     lamb = 0.001
-    num_bootstrap = 3
+    num_bootstrap = 10
     bootstrap_indices = bootstrap_data(train_matrix, num_bootstrap)
     models = []
 
