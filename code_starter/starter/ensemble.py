@@ -2,8 +2,9 @@ import numpy as np
 from torch.autograd import Variable
 import torch.utils.data
 import torch
+import torch.optim as optim
 
-from neural_network import AutoEncoder, train
+from neural_network import AutoEncoder
 from utils import (
     load_valid_csv,
     load_public_test_csv,
@@ -47,11 +48,9 @@ def bootstrap_data(data, num_bootstrap):
     num_data = data.shape[0]
     bootstrap_indices = []
     for _ in range(num_bootstrap):
-        indices = np.random.choice(num_data, num_data)
+        indices = np.random.choice(num_data, num_data, replace=True)
         bootstrap_indices.append(indices)
     return bootstrap_indices
-
-
 
 
 def evaluate(model, train_data, valid_data):
@@ -101,13 +100,37 @@ def evaluate_aggregated(aggregated_output, data):
         total += 1
     return correct / float(total)
 
+def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+    # Define optimizers and loss function.
+    optimizer = optim.SGD(model.parameters(), lr=lr)
+    num_student = train_data.shape[0]
+
+    for epoch in range(0, num_epoch):
+
+        for user_id in range(num_student):
+            inputs = zero_train_data[user_id].unsqueeze(0)
+            target = inputs.clone()
+
+            optimizer.zero_grad()
+            output = model(inputs)
+
+            # Mask the target to only compute the gradient of valid entries.
+            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
+            target[nan_mask] = output[nan_mask]
+
+            loss = torch.sum((output - target) ** 2.0)   + lamb * 0.5 * model.get_weight_norm()
+            loss.backward()
+            optimizer.step()
+
+
+
 def main():
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
     k = 50
     num_questions = zero_train_matrix.shape[1]
-    lr = 0.01
+    lr = 0.005
     num_epoch = 50
-    lamb = 0.01
+    lamb = 0.001
     num_bootstrap = 3
     bootstrap_indices = bootstrap_data(train_matrix, num_bootstrap)
     models = []
