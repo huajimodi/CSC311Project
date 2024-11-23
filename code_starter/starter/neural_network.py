@@ -12,14 +12,6 @@ from utils import (
     load_train_sparse,
 )
 
-file_path = "C:/CSC311/CSC311Project/code_starter/starter/data/train_sparse.npz"
-try:
-    data = np.load(file_path)
-    print("File loaded successfully!")
-except FileNotFoundError:
-    print("File not found!")
-except Exception as e:
-    print(f"An error occurred: {e}")
 def load_data(base_path="./data"):
     """Load the data in PyTorch Tensor.
 
@@ -33,7 +25,6 @@ def load_data(base_path="./data"):
         test_data: A dictionary {user_id: list,
         user_id: list, is_correct: list}
     """
-    base_path="C:/CSC311/CSC311Project/code_starter/starter/data"
     train_matrix = load_train_sparse(base_path).toarray()
     valid_data = load_valid_csv(base_path)
     test_data = load_public_test_csv(base_path)
@@ -188,7 +179,7 @@ def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch)
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[nan_mask] = output[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.0) #+ lamb / 2 * model.get_weight_norm()
+            loss = torch.sum((output - target) ** 2.0) + lamb / 2 * model.get_weight_norm()
             loss.backward()
             
 
