@@ -188,8 +188,9 @@ def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch)
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[nan_mask] = output[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.0) #+ lamb * regular
+            loss = torch.sum((output - target) ** 2.0) #+ lamb / 2 * model.get_weight_norm()
             loss.backward()
+            
 
             train_loss += loss.item()
             optimizer.step()
@@ -268,7 +269,7 @@ def main():
     # Set optimization hyperparameters.
     lr = 0.005
     num_epoch = 80
-    lamb = 0.01
+    lamb = 0.001
 
     # Record best hyper
     best_k = 0
@@ -276,7 +277,7 @@ def main():
     best_num_epoch = 0
     best_lamb = 0
     best_valid_acc = 0
-
+    
     for i in k:
 
         #Initalize the model
@@ -291,11 +292,11 @@ def main():
         if valid_acc > best_valid_acc:
             best_valid_acc = valid_acc
             best_k = i
-            best_lambda = lamb
+            best_lamb = lamb
 
         # Part (d): Retrain the best model and record metrics for plotting
     print(
-        f"\nRetraining the best model with k*={best_k} and lambda*={best_lambda} for plotting metrics...")
+        f"\nRetraining the best model with k*={best_k} and lambda*={best_lamb} for plotting metrics...")
 
     # Initialize the best model
     best_model = AutoEncoder(num_question=num_questions, k=best_k)
@@ -305,7 +306,7 @@ def main():
     # nn.init.xavier_uniform_(best_model.h.weight)
 
     # Train the best model and record metrics
-    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(best_model, lr, best_lambda,
+    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(best_model, lr, best_lamb,
                                                    train_matrix,
                                                    zero_train_matrix,
                                                    valid_data, num_epoch)
@@ -357,7 +358,7 @@ def main():
     # Evaluate the best model on the test set
     test_acc = evaluate(best_model, zero_train_matrix, test_data)
     print(
-        f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lambda}): {test_acc:.4f}")
+        f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lamb}): {test_acc:.4f}")
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
