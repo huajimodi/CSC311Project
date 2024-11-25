@@ -16,7 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def load_data(base_path="./data", thresh = 0.6):
+def load_data(base_path="./data", thresh=0.6):
     """Load the data in PyTorch Tensor.
 
     :return: (zero_train_matrix, train_data, valid_data, test_data, subject_meta, question_meta, C_Q_normalized)
@@ -119,7 +119,6 @@ def load_data(base_path="./data", thresh = 0.6):
     C_Q_normalized[C_Q_normalized < thresh] = 0
 
     return zero_train_matrix, train_matrix, valid_data, test_data, subject_meta, question_meta, C_Q_normalized
-
 
 
 class AutoEncoder(nn.Module):
@@ -408,9 +407,7 @@ def main():
         model = AutoEncoder(num_question=num_questions, k=k)
 
         # Train the model and record metrics
-        training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(
-            model, lr, lamb, gamma, train_matrix, zero_train_matrix, valid_data, C_Q_normalized, num_epoch
-        )
+        train_s(model, lr, lamb, gamma, train_matrix, zero_train_matrix, valid_data, C_Q_normalized, num_epoch)
 
         # Evaluate the model on validation data
         valid_acc = evaluate(model, zero_train_matrix, valid_data)
