@@ -68,7 +68,6 @@ class AutoEncoder(nn.Module):
         :return: user vector.
         """
         #####################################################################
-        # TODO:                                                             #
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
@@ -96,7 +95,6 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-    # TODO: Add a regularizer to the cost function.
     regular = model.get_weight_norm()
     # Tell PyTorch you are training the model.
     model.train()
@@ -148,7 +146,6 @@ def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch)
     :param num_epoch: int
     :return: tuple of (training_losses, validation_losses, training_accuracies, validation_accuracies)
     """
-    # TODO: Add a regularizer to the cost function.
     regular = model.get_weight_norm()
     # Tell PyTorch you are training the model.
     model.train()
@@ -248,7 +245,6 @@ def main():
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
 
     #####################################################################
-    # TODO:                                                             #
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
     #####################################################################
@@ -264,8 +260,6 @@ def main():
 
     # Record best hyper
     best_k = 0
-    best_lr = 0
-    best_num_epoch = 0
     best_lamb = 0
     best_valid_acc = 0
     
@@ -290,64 +284,64 @@ def main():
         f"\nRetraining the best model with k*={best_k} and lambda*={best_lamb} for plotting metrics...")
 
     # Initialize the best model
-    best_model = AutoEncoder(num_question=num_questions, k=best_k)
+    # best_model = AutoEncoder(num_question=num_questions, k=best_k)
 
     # Optionally, initialize weights (already done in AutoEncoder class)
     # nn.init.xavier_uniform_(best_model.g.weight)
     # nn.init.xavier_uniform_(best_model.h.weight)
 
     # Train the best model and record metrics
-    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(best_model, lr, best_lamb,
-                                                   train_matrix,
-                                                   zero_train_matrix,
-                                                   valid_data, num_epoch)
+    # training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(best_model, lr, best_lamb,
+    #                                                train_matrix,
+    #                                                zero_train_matrix,
+    #                                                valid_data, num_epoch)
 
 # Plot training loss, validation loss, training accuracy, and validation accuracy over epochs
-    epochs = range(1, num_epoch + 1)
-
-    plt.figure(figsize=(18, 10))
-
-    # Plot Training Loss
-    plt.subplot(2, 2, 1)
-    plt.plot(epochs, training_losses, label='Training Loss', color='blue')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training Loss over Epochs')
-    plt.legend()
-    plt.grid(True)
-
-    # Plot Validation Loss
-    plt.subplot(2, 2, 1)
-    plt.plot(epochs, validation_losses, label='Validation Loss', color='red')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Validation Loss over Epochs')
-    plt.legend()
-    plt.grid(True)
-
-    # Plot Training Accuracy
-    plt.subplot(2, 2, 3)
-    plt.plot(epochs, training_accuracies, label='Training Accuracy', color='orange')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('Training Accuracy over Epochs')
-    plt.legend()
-    plt.grid(True)
-
-    # Plot Validation Accuracy
-    plt.subplot(2, 2, 3)
-    plt.plot(epochs, validation_accuracies, label='Validation Accuracy', color='green')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('Validation Accuracy over Epochs')
-    plt.legend()
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.show()
+#     epochs = range(1, num_epoch + 1)
+#
+#     plt.figure(figsize=(18, 10))
+#
+#     # Plot Training Loss
+#     plt.subplot(2, 2, 1)
+#     plt.plot(epochs, training_losses, label='Training Loss', color='blue')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Loss')
+#     plt.title('Training Loss over Epochs')
+#     plt.legend()
+#     plt.grid(True)
+#
+#     # Plot Validation Loss
+#     plt.subplot(2, 2, 1)
+#     plt.plot(epochs, validation_losses, label='Validation Loss', color='red')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Loss')
+#     plt.title('Validation Loss over Epochs')
+#     plt.legend()
+#     plt.grid(True)
+#
+#     # Plot Training Accuracy
+#     plt.subplot(2, 2, 3)
+#     plt.plot(epochs, training_accuracies, label='Training Accuracy', color='orange')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Accuracy')
+#     plt.title('Training Accuracy over Epochs')
+#     plt.legend()
+#     plt.grid(True)
+#
+#     # Plot Validation Accuracy
+#     plt.subplot(2, 2, 3)
+#     plt.plot(epochs, validation_accuracies, label='Validation Accuracy', color='green')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Accuracy')
+#     plt.title('Validation Accuracy over Epochs')
+#     plt.legend()
+#     plt.grid(True)
+#
+#     plt.tight_layout()
+#     plt.show()
 
     # Evaluate the best model on the test set
-    test_acc = evaluate(best_model, zero_train_matrix, test_data)
+    test_acc = evaluate(model, zero_train_matrix, test_data)
     print(
         f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lamb}): {test_acc:.4f}")
     #####################################################################
