@@ -16,7 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def load_data(base_path="./data"):
+def load_data(base_path="./data", thresh = 0.6):
     """Load the data in PyTorch Tensor.
 
     :return: (zero_train_matrix, train_data, valid_data, test_data, subject_meta, question_meta, C_Q_normalized)
@@ -27,7 +27,7 @@ def load_data(base_path="./data"):
         test_data: A dictionary {user_id: list, question_id: list, is_correct: list}
         subject_meta: DataFrame containing subject metadata
         question_meta: DataFrame containing question metadata
-        C_Q_normalized: 2D NumPy array representing C_Q
+        C_Q_normalized: 2D NumPy array representing the normalized Question Correlation Matrix
     """
     # Load train, validation, and test data
     train_matrix = load_train_sparse(base_path).toarray()
@@ -38,7 +38,7 @@ def load_data(base_path="./data"):
     zero_train_matrix = train_matrix.copy()
     zero_train_matrix[np.isnan(train_matrix)] = 0
 
-    # Convert to Float Tensor for PyTorch.
+    # Convert to FloatTensor for PyTorch.
     zero_train_matrix = torch.FloatTensor(zero_train_matrix)
     train_matrix = torch.FloatTensor(train_matrix)
 
@@ -94,15 +94,32 @@ def load_data(base_path="./data"):
     C_Q = np.dot(np.dot(A, C_S), A.T)  # Shape: [Q, Q]
 
     # Normalize C_Q to ensure similarity scores are between 0 and 1
-    sum_subjects = A.sum(axis=1).reshape(-1, 1)  # Shape: [Q, 1]
-    # To avoid division by zero, replace zeros with ones
-    sum_subjects[sum_subjects == 0] = 1
-    normalization_matrix = np.sqrt(np.dot(sum_subjects, sum_subjects.T))  # Shape: [Q, Q]
+    # Compute the diagonal elements of C_Q
+    C_Q_diag = np.diag(C_Q)  # Shape: [Q]
+
+    # Compute normalization matrix
+    normalization_matrix = np.sqrt(np.outer(C_Q_diag, C_Q_diag))  # Shape: [Q, Q]
+
+    # Avoid division by zero by replacing zeros with a small epsilon
+    epsilon = 1e-8
+    normalization_matrix[normalization_matrix == 0] = epsilon
+
+    # Normalize C_Q
     C_Q_normalized = C_Q / normalization_matrix
+
     # Replace any NaN values resulting from division by zero with zero
     C_Q_normalized = np.nan_to_num(C_Q_normalized)
 
+    # Set diagonal entries to 1
+    np.fill_diagonal(C_Q_normalized, 1.0)
+
+    # Clip values to [0, 1]
+    C_Q_normalized = np.clip(C_Q_normalized, 0, 1)
+
+    C_Q_normalized[C_Q_normalized < thresh] = 0
+
     return zero_train_matrix, train_matrix, valid_data, test_data, subject_meta, question_meta, C_Q_normalized
+
 
 
 class AutoEncoder(nn.Module):
@@ -191,12 +208,19 @@ def train_s(
 
             # Compute regularization term
             decoder_weights = model.h.weight  # Shape: [Q, k]
+            # reg_term = torch.trace(
+            #     torch.matmul(
+            #         torch.matmul(decoder_weights.t(), C_Q_tensor),
+            #         decoder_weights
+            #     )
+            # )
             reg_term = torch.trace(
                 torch.matmul(
                     torch.matmul(decoder_weights.t(), C_Q_tensor),
                     decoder_weights
                 )
-            )
+            ).clamp(min=0)  # Clamp to ensure non-negativity
+
             reg_loss = lamb * reg_term
 
             # Compute reconstruction loss
@@ -240,9 +264,9 @@ def train_s(
         validation_accuracies.append(valid_acc)
 
         # Adjust regularization strength dynamically
-        if epoch > 0 and validation_accuracies[-1] < validation_accuracies[-2]:
-            lamb *= 0.9  # Reduce lambda if validation accuracy decreases
-            print("decreases")
+        # if epoch > 0 and validation_accuracies[-1] < validation_accuracies[-2]:
+        #     lamb *= 0.9  # Reduce lambda if validation accuracy decreases
+        #     print("decreases")
 
         # Print metrics
         print(
@@ -367,7 +391,9 @@ def main():
     # Set optimization hyperparameters
     lr = 0.005
     num_epoch = 80
-    lamb = 0.001
+    # record
+    # lma = 0.001, acc = 0.6754
+    lamb = 0.003
     gamma = 0.001
 
     # Initialize variables to keep track of the best hyperparameters
