@@ -119,7 +119,7 @@ def main():
     lr = 0.005
     num_epoch = 80
     lamb = 0.001
-    num_bootstrap = 10
+    num_bootstrap = 3
     bootstrap_indices = bootstrap_data(train_matrix, num_bootstrap)
     models = []
 
