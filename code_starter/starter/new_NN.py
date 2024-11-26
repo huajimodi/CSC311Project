@@ -359,7 +359,7 @@ def visualize_question_correlation(question_correlation_df, num_visualize=20):
         f'Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
     plt.xlabel('Question ID')
     plt.ylabel('Question ID')
-    plt.show()
+    # plt.show()
 
 
 def visualize_clustered_question_correlation(question_correlation_df,
