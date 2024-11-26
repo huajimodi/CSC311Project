@@ -122,7 +122,7 @@ def load_data(base_path="./data", thresh=1.2):
     for student_id in range(num_students):
         for question_id in range(num_questions):
             if np.isnan(zero_train_matrix[student_id, question_id]):
-                similar_questions = np.where(C_Q_normalized[question_id] > 0.34)[
+                similar_questions = np.where(C_Q_normalized[question_id] > 0.35)[
                     0]
                 similar_answers = [zero_train_matrix[student_id, q] for q in
                                    similar_questions if not np.isnan(
