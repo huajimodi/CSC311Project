@@ -16,7 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def load_data(base_path="./data", thresh=0.6):
+def load_data(base_path="./data", thresh=1.2):
     """Load the data in PyTorch Tensor.
 
     :return: (zero_train_matrix, train_data, valid_data, test_data, subject_meta, question_meta, C_Q_normalized)
@@ -36,6 +36,8 @@ def load_data(base_path="./data", thresh=0.6):
 
     # Fill in the missing entries with 0.
     zero_train_matrix = train_matrix.copy()
+    zero_train_matrix[(train_matrix == 0) & (~np.isnan(train_matrix))] = -1
+    zero_train_matrix[np.isnan(train_matrix)] = 0
     zero_train_matrix[np.isnan(train_matrix)] = 0
 
     # Convert to FloatTensor for PyTorch.
