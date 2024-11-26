@@ -21,7 +21,7 @@ def load_data(base_path="./data", thresh=1.2):
 
     :return: (zero_train_matrix, train_data, valid_data, test_data, subject_meta, question_meta, C_Q_normalized)
         WHERE:
-        zero_train_matrix: 2D FloatTensor where missing entries are filled with 0.
+        zero_train_matrix: 2D FloatTensor where missing entries are filled based on correlation.
         train_data: 2D FloatTensor
         valid_data: A dictionary {user_id: list, question_id: list, is_correct: list}
         test_data: A dictionary {user_id: list, question_id: list, is_correct: list}
@@ -33,16 +33,6 @@ def load_data(base_path="./data", thresh=1.2):
     train_matrix = load_train_sparse(base_path).toarray()
     valid_data = load_valid_csv(base_path)
     test_data = load_public_test_csv(base_path)
-
-    # Fill in the missing entries with 0.
-    zero_train_matrix = train_matrix.copy()
-    zero_train_matrix[(train_matrix == 0) & (~np.isnan(train_matrix))] = -1
-    zero_train_matrix[np.isnan(train_matrix)] = 0
-    zero_train_matrix[np.isnan(train_matrix)] = 0
-
-    # Convert to FloatTensor for PyTorch.
-    zero_train_matrix = torch.FloatTensor(zero_train_matrix)
-    train_matrix = torch.FloatTensor(train_matrix)
 
     # Load subject metadata
     subject_meta = pd.read_csv(f'{base_path}/subject_meta.csv')
@@ -64,9 +54,11 @@ def load_data(base_path="./data", thresh=1.2):
         except:
             pass
         # If not a list, split by comma and convert to integers
-        return [int(s.strip()) for s in subjects_str.split(',') if s.strip().isdigit()]
+        return [int(s.strip()) for s in subjects_str.split(',') if
+                s.strip().isdigit()]
 
-    question_meta['subjects'] = question_meta['subject_id'].apply(parse_subjects)
+    question_meta['subjects'] = question_meta['subject_id'].apply(
+        parse_subjects)
 
     # Construct the Question-Subject Assignment Matrix A
     unique_subjects = subject_meta['subject_id'].unique()
@@ -100,7 +92,8 @@ def load_data(base_path="./data", thresh=1.2):
     C_Q_diag = np.diag(C_Q)  # Shape: [Q]
 
     # Compute normalization matrix
-    normalization_matrix = np.sqrt(np.outer(C_Q_diag, C_Q_diag))  # Shape: [Q, Q]
+    normalization_matrix = np.sqrt(
+        np.outer(C_Q_diag, C_Q_diag))  # Shape: [Q, Q]
 
     # Avoid division by zero by replacing zeros with a small epsilon
     epsilon = 1e-8
@@ -119,6 +112,33 @@ def load_data(base_path="./data", thresh=1.2):
     C_Q_normalized = np.clip(C_Q_normalized, 0, 1)
 
     C_Q_normalized[C_Q_normalized < thresh] = 0
+
+    # Fill in missing entries in the train_matrix based on correlation
+    zero_train_matrix = train_matrix.copy()
+    num_students, num_questions = zero_train_matrix.shape
+    zero_train_matrix[zero_train_matrix == 0] = -1
+
+    # Replace missing values based on correlation with similar questions
+    for student_id in range(num_students):
+        for question_id in range(num_questions):
+            if np.isnan(zero_train_matrix[student_id, question_id]):
+                similar_questions = np.where(C_Q_normalized[question_id] > 0.34)[
+                    0]
+                similar_answers = [zero_train_matrix[student_id, q] for q in
+                                   similar_questions if not np.isnan(
+                        zero_train_matrix[student_id, q])]
+
+                if len(similar_answers) > 0:
+                    # If there are similar questions answered, use the majority answer
+                    zero_train_matrix[student_id, question_id] = 1 if np.mean(
+                        similar_answers) > 0.5 else -1
+                else:
+                    # If no similar questions answered, set to -1 (not answered)
+                    zero_train_matrix[student_id, question_id] = 0
+
+    # Convert to FloatTensor for PyTorch.
+    zero_train_matrix = torch.FloatTensor(zero_train_matrix)
+    train_matrix = torch.FloatTensor(train_matrix)
 
     return zero_train_matrix, train_matrix, valid_data, test_data, subject_meta, question_meta, C_Q_normalized
 
@@ -159,7 +179,8 @@ class AutoEncoder(nn.Module):
 
 
 def train_s(
-        model, lr, lamb, gamma, train_data, zero_train_data, valid_data, C_Q, num_epoch
+        model, lr, lamb, gamma, train_data, zero_train_data, valid_data, C_Q,
+        num_epoch
 ):
     """Train the neural network with regularization and record metrics.
 
@@ -179,7 +200,8 @@ def train_s(
     C_Q_tensor = torch.FloatTensor(C_Q)
 
     # Define optimizer and loss function
-    optimizer = optim.SGD(model.parameters(), lr=lr, weight_decay=1e-4)  # Add weight decay
+    optimizer = optim.SGD(model.parameters(), lr=lr,
+                          weight_decay=1e-4)  # Add weight decay
     criterion = nn.MSELoss()
 
     num_students = train_data.shape[0]
@@ -209,12 +231,6 @@ def train_s(
 
             # Compute regularization term
             decoder_weights = model.h.weight  # Shape: [Q, k]
-            # reg_term = torch.trace(
-            #     torch.matmul(
-            #         torch.matmul(decoder_weights.t(), C_Q_tensor),
-            #         decoder_weights
-            #     )
-            # )
             reg_term = torch.trace(
                 torch.matmul(
                     torch.matmul(decoder_weights.t(), C_Q_tensor),
@@ -223,6 +239,10 @@ def train_s(
             ).clamp(min=0)  # Clamp to ensure non-negativity
 
             reg_loss = lamb * reg_term
+
+            # Compute L1 regularization term
+            l1_reg_term = lamb * (torch.norm(model.g.weight, 1) + torch.norm(
+                model.h.weight, 1))
 
             # Compute reconstruction loss
             loss = (
@@ -255,7 +275,8 @@ def train_s(
             target_val = torch.FloatTensor([valid_data["is_correct"][i]])
             output_val = model(inputs)
             valid_loss += torch.sum(
-                (output_val[0][valid_data["question_id"][i]] - target_val) ** 2.0
+                (output_val[0][
+                     valid_data["question_id"][i]] - target_val) ** 2.0
             ).item()
 
         # Append metrics
@@ -296,7 +317,8 @@ def evaluate(model, train_data, valid_data):
             inputs = train_data[u].unsqueeze(0)
             output = model(inputs)
 
-            guess = (output[0][valid_data["question_id"][i]] >= 0.5).float().item()
+            guess = (output[0][
+                         valid_data["question_id"][i]] >= 0.5).float().item()
             if guess == valid_data["is_correct"][i]:
                 correct += 1
             total += 1
@@ -314,7 +336,8 @@ def visualize_question_correlation(question_correlation_df, num_visualize=20):
     """
     # Select a subset of questions
     subset_questions = question_correlation_df.index[:num_visualize]
-    subset_correlation = question_correlation_df.loc[subset_questions, subset_questions]
+    subset_correlation = question_correlation_df.loc[
+        subset_questions, subset_questions]
 
     # Set up the matplotlib figure
     plt.figure(figsize=(12, 10))
@@ -332,13 +355,15 @@ def visualize_question_correlation(question_correlation_df, num_visualize=20):
         cbar_kws={"shrink": .5}
     )
 
-    plt.title(f'Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
+    plt.title(
+        f'Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
     plt.xlabel('Question ID')
     plt.ylabel('Question ID')
     plt.show()
 
 
-def visualize_clustered_question_correlation(question_correlation_df, num_visualize=50):
+def visualize_clustered_question_correlation(question_correlation_df,
+                                             num_visualize=50):
     """
     Visualize the clustered Question Correlation Matrix using a clustermap.
 
@@ -348,7 +373,8 @@ def visualize_clustered_question_correlation(question_correlation_df, num_visual
     """
     # Select a subset of questions
     subset_questions = question_correlation_df.index[:num_visualize]
-    subset_correlation = question_correlation_df.loc[subset_questions, subset_questions]
+    subset_correlation = question_correlation_df.loc[
+        subset_questions, subset_questions]
 
     # Generate a clustermap
     sns.clustermap(
@@ -360,7 +386,8 @@ def visualize_clustered_question_correlation(question_correlation_df, num_visual
         cbar_kws={"shrink": .5}
     )
 
-    plt.title(f'Clustered Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
+    plt.title(
+        f'Clustered Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
     plt.show()
 
 
@@ -394,7 +421,7 @@ def main():
     num_epoch = 80
     # record
     # lma = 0.001, acc = 0.6754
-    lamb = 0.003
+    lamb = 0
     gamma = 0.001
 
     # Initialize variables to keep track of the best hyperparameters
@@ -409,7 +436,8 @@ def main():
         model = AutoEncoder(num_question=num_questions, k=k)
 
         # Train the model and record metrics
-        train_s(model, lr, lamb, gamma, train_matrix, zero_train_matrix, valid_data, C_Q_normalized, num_epoch)
+        train_s(model, lr, lamb, gamma, train_matrix, zero_train_matrix,
+                valid_data, C_Q_normalized, num_epoch)
 
         # Evaluate the model on validation data
         valid_acc = evaluate(model, zero_train_matrix, valid_data)
@@ -453,37 +481,12 @@ def main():
     # plt.plot(epochs, validation_losses, label='Validation Loss', color='red')
     # plt.xlabel('Epoch')
     # plt.ylabel('Loss')
-    # plt.title('Validation Loss over Epochs')
-    # plt.legend()
-    # plt.grid(True)
-    #
-    # # Plot Training Accuracy
-    # plt.subplot(2, 2, 3)
-    # plt.plot(epochs, training_accuracies, label='Training Accuracy', color='orange')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Accuracy')
-    # plt.title('Training Accuracy over Epochs')
-    # plt.legend()
-    # plt.grid(True)
-    #
-    # # Plot Validation Accuracy
-    # plt.subplot(2, 2, 4)
-    # plt.plot(epochs, validation_accuracies, label='Validation Accuracy', color='green')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Accuracy')
-    # plt.title('Validation Accuracy over Epochs')
-    # plt.legend()
-    # plt.grid(True)
-    #
-    # plt.tight_layout()
-    # plt.show()
 
     # Evaluate the best model on the test set
     test_acc = evaluate(model, zero_train_matrix, test_data)
     print(
         f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lamb}): {test_acc:.4f}"
     )
-
 
 if __name__ == "__main__":
     main()
