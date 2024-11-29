@@ -428,82 +428,58 @@ def main():
     # visualize_clustered_question_correlation(question_correlation_df, num_visualize=50)
 
     #####################################################################
-    # Try out different k and select the best k using the validation set.
-    #####################################################################
-    # Define the list of k values to experiment with
-    k_values = [50]  # You can adjust this list based on your requirements
+    k = 50
     num_questions = zero_train_matrix.shape[1]
 
     # Set optimization hyperparameters
     lr = 0.005
     num_epoch = 80
-    # record
-    # lma = 0.001, acc = 0.6754
     lamb = 0
     gamma = 0.001
 
-    # Initialize variables to keep track of the best hyperparameters
-    best_k = 0
-    best_lamb = 0
-    best_valid_acc = 0
+    # Initialize best hyperparameters
+    print(f"\n--- Training AutoEncoder with k={k} ---")
+    # Initialize the model
+    model = AutoEncoder(num_question=num_questions, k=k)
 
-    # Iterate over different k values to find the best one
-    for k in k_values:
-        print(f"\n--- Training AutoEncoder with k={k} ---")
-        # Initialize the model
-        model = AutoEncoder(num_question=num_questions, k=k)
+    # Train the model and record metrics
+    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(model, lr, lamb,
+                                                                                             gamma, train_matrix,
+                                                                                             zero_train_matrix,
+                                                                                             valid_data,
+                                                                                             C_Q_normalized,
+                                                                                             num_epoch)
 
-        # Train the model and record metrics
-        train_s(model, lr, lamb, gamma, train_matrix, zero_train_matrix,
-                valid_data, C_Q_normalized, num_epoch)
+    # Evaluate the model on validation data
+    valid_acc = evaluate(model, zero_train_matrix, valid_data)
+    print(f"Validation Accuracy for k={k}, lambda={lamb}: {valid_acc:.4f}")
 
-        # Evaluate the model on validation data
-        valid_acc = evaluate(model, zero_train_matrix, valid_data)
-        print(f"Validation Accuracy for k={k}, lambda={lamb}: {valid_acc:.4f}")
 
-        # Update the best hyperparameters if current model is better
-        if valid_acc > best_valid_acc:
-            best_valid_acc = valid_acc
-            best_k = k
-            best_lamb = lamb
+    #####################################################################
+    epochs = range(1, num_epoch + 1)
 
-    # Retrain the best model and record metrics for plotting
-    print(
-        f"\nRetraining the best model with k*={best_k} and lambda*={best_lamb} for plotting metrics..."
-    )
+    plt.figure(figsize=(18, 10))
 
-    # Initialize the best model
-    # best_model = AutoEncoder(num_question=num_questions, k=best_k)
-    #
-    # # Train the best model and record metrics
-    # training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(
-    #     best_model, lr, best_lamb, train_matrix, zero_train_matrix, valid_data, C_Q_normalized, num_epoch
-    # )
+    # Plot Training Loss
+    plt.subplot(2, 2, 1)
+    plt.plot(epochs, training_accuracies, label='Training Acc', color='blue')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss over Epochs')
+    plt.legend()
+    plt.grid(True)
 
-    # Plot training loss, validation loss, training accuracy, and validation accuracy over epochs
-    # epochs = range(1, num_epoch + 1)
+    # Plot Validation Loss
+    plt.subplot(2, 2, 2)
+    plt.plot(epochs, validation_accuracies, label='Validation Acc', color='red')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
 
-    # plt.figure(figsize=(18, 10))
-    #
-    # # Plot Training Loss
-    # plt.subplot(2, 2, 1)
-    # plt.plot(epochs, training_losses, label='Training Loss', color='blue')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Loss')
-    # plt.title('Training Loss over Epochs')
-    # plt.legend()
-    # plt.grid(True)
-    #
-    # # Plot Validation Loss
-    # plt.subplot(2, 2, 2)
-    # plt.plot(epochs, validation_losses, label='Validation Loss', color='red')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Loss')
-
+    plt.show()
     # Evaluate the best model on the test set
     test_acc = evaluate(model, zero_train_matrix, test_data)
     print(
-        f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lamb}): {test_acc:.4f}"
+        f"\nFinal Test Accuracy for the best model (k*={k}, lambda*={lamb}): {test_acc:.4f}"
     )
 
 
