@@ -65,7 +65,6 @@ def parse_subjects(subjects_str):
             return subjects
     except:
         pass
-    # If not a list, split by comma and convert to integers
     return [int(s.strip()) for s in subjects_str.split(',') if
                 s.strip().isdigit()]
 
@@ -148,7 +147,7 @@ def load_data(base_path="./data", theta=0.35):
                 valid_answers = [zero_train_matrix[student_id, q] for q in cluster_questions if
                                  not np.isnan(zero_train_matrix[student_id, q])]
 
-                if len(valid_answers) > 0:
+                if len(valid_answers) > 1:
                     # Use majority voting
                     zero_train_matrix[student_id, question_id] = 1 if np.mean(valid_answers) > 0.5 else -1
                 else:
@@ -197,14 +196,13 @@ class AutoEncoder(nn.Module):
 
 
 def train_s(
-        model, lr, lamb, gamma, train_data, zero_train_data, valid_data, C_Q,
+        model, lr, lamb, train_data, zero_train_data, valid_data, C_Q,
         num_epoch
 ):
     """Train the neural network with regularization and record metrics.
 
     :param model: Module
     :param lr: float, learning rate
-    :param lamb: float, regularization strength
     :param train_data: 2D FloatTensor
     :param zero_train_data: 2D FloatTensor
     :param valid_data: Dict
@@ -256,26 +254,19 @@ def train_s(
                 )
             ).clamp(min=0)  # Clamp to ensure non-negativity
 
-            reg_loss = lamb * reg_term
-
-            # Compute L1 regularization term
-            l1_reg_term = lamb * (torch.norm(model.g.weight, 1) + torch.norm(
-                model.h.weight, 1))
-
             # Compute reconstruction loss
             loss = (
                     torch.sum((output - target) ** 2.0)
-                    + gamma / 2 * model.get_weight_norm()
-                    + reg_loss
+                    + lamb / 2 * model.get_weight_norm()
             )
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
 
             # Calculate training accuracy for valid entries
-            predicted = (output >= 0.5).float().squeeze(0)  # Shape: [Q]
-            valid_entries = ~nan_mask  # Shape: [Q]
-            target_squeezed = target.squeeze(0)  # Shape: [Q]
+            predicted = (output >= 0.5).float().squeeze(0)
+            valid_entries = ~nan_mask
+            target_squeezed = target.squeeze(0)
 
             correct_preds += torch.sum(
                 predicted[valid_entries] == target_squeezed[valid_entries]
@@ -303,10 +294,6 @@ def train_s(
         validation_losses.append(valid_loss)
         validation_accuracies.append(valid_acc)
 
-        # Adjust regularization strength dynamically
-        # if epoch > 0 and validation_accuracies[-1] < validation_accuracies[-2]:
-        #     lamb *= 0.9  # Reduce lambda if validation accuracy decreases
-        #     print("decreases")
 
         # Print metrics
         print(
@@ -413,8 +400,6 @@ def main():
     # Load all data including correlation matrices
     zero_train_matrix, train_matrix, valid_data, test_data, question_meta, C_Q_normalized = load_data()
 
-    # Optional: Visualize a subset of the Question Correlation Matrix
-    # Convert C_Q_normalized to DataFrame for easy indexing
     question_ids = question_meta['question_id'].tolist()
     question_correlation_df = pd.DataFrame(
         C_Q_normalized,
@@ -422,10 +407,7 @@ def main():
         columns=question_ids
     )
 
-    # Visualize the correlation matrix (adjust num_visualize as needed)
     visualize_question_correlation(question_correlation_df, num_visualize=20)
-    # Or use clustered heatmap
-    # visualize_clustered_question_correlation(question_correlation_df, num_visualize=50)
 
     #####################################################################
     k = 50
@@ -434,17 +416,14 @@ def main():
     # Set optimization hyperparameters
     lr = 0.005
     num_epoch = 80
-    lamb = 0
-    gamma = 0.001
+    lamb = 0.001
 
-    # Initialize best hyperparameters
     print(f"\n--- Training AutoEncoder with k={k} ---")
-    # Initialize the model
     model = AutoEncoder(num_question=num_questions, k=k)
 
     # Train the model and record metrics
-    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(model, lr, lamb,
-                                                                                             gamma, train_matrix,
+    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(model, lr,
+                                                                                             lamb, train_matrix,
                                                                                              zero_train_matrix,
                                                                                              valid_data,
                                                                                              C_Q_normalized,
@@ -452,7 +431,7 @@ def main():
 
     # Evaluate the model on validation data
     valid_acc = evaluate(model, zero_train_matrix, valid_data)
-    print(f"Validation Accuracy for k={k}, lambda={lamb}: {valid_acc:.4f}")
+    print(f"Validation Accuracy for k={k}, : {valid_acc:.4f}")
 
 
     #####################################################################
@@ -464,8 +443,8 @@ def main():
     plt.subplot(2, 2, 1)
     plt.plot(epochs, training_accuracies, label='Training Acc', color='blue')
     plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training Loss over Epochs')
+    plt.ylabel('Training Acc')
+    plt.title('Training Accuracy over Epochs')
     plt.legend()
     plt.grid(True)
 
@@ -473,13 +452,15 @@ def main():
     plt.subplot(2, 2, 2)
     plt.plot(epochs, validation_accuracies, label='Validation Acc', color='red')
     plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-
+    plt.ylabel('Validation Acc')
+    plt.title('Validation Accuracy over Epochs')
+    plt.legend()
+    plt.grid(True)
     plt.show()
     # Evaluate the best model on the test set
     test_acc = evaluate(model, zero_train_matrix, test_data)
     print(
-        f"\nFinal Test Accuracy for the best model (k*={k}, lambda*={lamb}): {test_acc:.4f}"
+        f"\nFinal Test Accuracy for the best model (k*={k}): {test_acc:.4f}"
     )
 
 
