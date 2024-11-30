@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
 import torch
@@ -15,6 +14,7 @@ from sklearn.cluster import KMeans
 import ast  # For safely evaluating string representations of lists
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
 
 def question_correlation_matrix(A, C_S):
     """Compute the Question Correlation Matrix C_Q using the Assignment Matrix A and Subject Correlation Matrix C_S.
@@ -66,7 +66,7 @@ def parse_subjects(subjects_str):
     except:
         pass
     return [int(s.strip()) for s in subjects_str.split(',') if
-                s.strip().isdigit()]
+            s.strip().isdigit()]
 
 
 def get_correlation_matrix(base_path="./data"):
@@ -75,7 +75,6 @@ def get_correlation_matrix(base_path="./data"):
 
     # Load question metadata
     question_meta = pd.read_csv(f'{base_path}/question_meta.csv')
-
     question_meta['subjects'] = question_meta['subject_id'].apply(
         parse_subjects)
 
@@ -90,7 +89,7 @@ def get_correlation_matrix(base_path="./data"):
 
     # Populate the assignment matrix
     for idx, row in question_meta.iterrows():
-        question_idx = idx  # Assuming question_meta is indexed from 0 to Q-1
+        question_idx = idx
         subjects = row['subjects']
         for s in subjects:
             # Find the column index for subject s
@@ -101,12 +100,12 @@ def get_correlation_matrix(base_path="./data"):
     # Compute the Subject Correlation Matrix C_S using cosine similarity on TF-IDF vectors
     vectorizer = TfidfVectorizer(stop_words='english')
     tfidf_matrix = vectorizer.fit_transform(subject_meta['name'])
-    C_S = cosine_similarity(tfidf_matrix, tfidf_matrix)  # Shape: [S, S]
+    C_S = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
     return question_correlation_matrix(A, C_S)
 
 
-def load_data(base_path="./data", theta=0.35):
+def load_data(base_path="./data", k_mean=14):
     """Load the data in PyTorch Tensor.
 
     :return: (zero_train_matrix, train_data, valid_data, test_data, subject_meta, question_meta, C_Q_normalized)
@@ -132,7 +131,7 @@ def load_data(base_path="./data", theta=0.35):
     zero_train_matrix[zero_train_matrix == 0] = -1
 
     # Cluster questions based on the correlation matrix
-    num_clusters = 14
+    num_clusters = k_mean
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     clusters = kmeans.fit_predict(C_Q_normalized)
 
@@ -195,7 +194,7 @@ class AutoEncoder(nn.Module):
         return souter
 
 
-def train_s(
+def train(
         model, lr, lamb, train_data, zero_train_data, valid_data, C_Q,
         num_epoch
 ):
@@ -203,6 +202,7 @@ def train_s(
 
     :param model: Module
     :param lr: float, learning rate
+    :param lamb: float, regularization parameter
     :param train_data: 2D FloatTensor
     :param zero_train_data: 2D FloatTensor
     :param valid_data: Dict
@@ -212,13 +212,11 @@ def train_s(
     """
     # Ensure C_Q matches the number of questions
     num_questions = train_data.shape[1]
-    C_Q = C_Q[:num_questions, :num_questions]  # Resize to [Q, Q]
+    C_Q = C_Q[:num_questions, :num_questions]
     C_Q_tensor = torch.FloatTensor(C_Q)
 
     # Define optimizer and loss function
-    optimizer = optim.SGD(model.parameters(), lr=lr,
-                          weight_decay=1e-4)  # Add weight decay
-    criterion = nn.MSELoss()
+    optimizer = optim.SGD(model.parameters(), lr=lr)
 
     num_students = train_data.shape[0]
 
@@ -235,24 +233,24 @@ def train_s(
         total_preds = 0
 
         for user_id in range(num_students):
-            inputs = zero_train_data[user_id].unsqueeze(0)  # Shape: [1, Q]
-            target = train_data[user_id].unsqueeze(0).clone()  # Shape: [1, Q]
+            inputs = zero_train_data[user_id].unsqueeze(0)
+            target = train_data[user_id].unsqueeze(0).clone()
 
             optimizer.zero_grad()
-            output = model(inputs)  # Shape: [1, Q]
+            output = model(inputs)
 
             # Create mask for NaN entries
             nan_mask = torch.isnan(train_data[user_id])
             target[0][nan_mask] = output[0][nan_mask]
 
             # Compute regularization term
-            decoder_weights = model.h.weight  # Shape: [Q, k]
+            decoder_weights = model.h.weight
             reg_term = torch.trace(
                 torch.matmul(
                     torch.matmul(decoder_weights.t(), C_Q_tensor),
                     decoder_weights
                 )
-            ).clamp(min=0)  # Clamp to ensure non-negativity
+            ).clamp(min=0)
 
             # Compute reconstruction loss
             loss = (
@@ -293,7 +291,6 @@ def train_s(
         training_accuracies.append(train_acc)
         validation_losses.append(valid_loss)
         validation_accuracies.append(valid_acc)
-
 
         # Print metrics
         print(
@@ -360,45 +357,21 @@ def visualize_question_correlation(question_correlation_df, num_visualize=20):
         cbar_kws={"shrink": .5}
     )
 
-    plt.title(
-        f'Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
+    plt.title(f'Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
     plt.xlabel('Question ID')
     plt.ylabel('Question ID')
-    # plt.show()
-
-
-def visualize_clustered_question_correlation(question_correlation_df,
-                                             num_visualize=50):
-    """
-    Visualize the clustered Question Correlation Matrix using a clustermap.
-
-    :param question_correlation_df: DataFrame, Question Correlation Matrix
-    :param num_visualize: int, number of questions to visualize
-    :return: None
-    """
-    # Select a subset of questions
-    subset_questions = question_correlation_df.index[:num_visualize]
-    subset_correlation = question_correlation_df.loc[
-        subset_questions, subset_questions]
-
-    # Generate a clustermap
-    sns.clustermap(
-        subset_correlation,
-        method='average',
-        cmap='viridis',
-        figsize=(12, 10),
-        linewidths=.5,
-        cbar_kws={"shrink": .5}
-    )
-
-    plt.title(
-        f'Clustered Question Correlation Matrix Heatmap (Subset of {num_visualize} Questions)')
     plt.show()
 
 
 def main():
+    # Set optimization hyperparameters
+    lr = 0.005
+    num_epoch = 80
+    lamb = 0.001
+    k_mean = 14
+
     # Load all data including correlation matrices
-    zero_train_matrix, train_matrix, valid_data, test_data, question_meta, C_Q_normalized = load_data()
+    zero_train_matrix, train_matrix, valid_data, test_data, question_meta, C_Q_normalized = load_data(k_mean=k_mean)
 
     question_ids = question_meta['question_id'].tolist()
     question_correlation_df = pd.DataFrame(
@@ -413,26 +386,17 @@ def main():
     k = 50
     num_questions = zero_train_matrix.shape[1]
 
-    # Set optimization hyperparameters
-    lr = 0.005
-    num_epoch = 80
-    lamb = 0.001
-
     print(f"\n--- Training AutoEncoder with k={k} ---")
     model = AutoEncoder(num_question=num_questions, k=k)
 
     # Train the model and record metrics
-    training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(model, lr,
-                                                                                             lamb, train_matrix,
-                                                                                             zero_train_matrix,
-                                                                                             valid_data,
-                                                                                             C_Q_normalized,
-                                                                                             num_epoch)
+    training_losses, validation_losses, training_accuracies, validation_accuracies = (
+        train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, C_Q_normalized, num_epoch)
+    )
 
     # Evaluate the model on validation data
     valid_acc = evaluate(model, zero_train_matrix, valid_data)
     print(f"Validation Accuracy for k={k}, : {valid_acc:.4f}")
-
 
     #####################################################################
     epochs = range(1, num_epoch + 1)
@@ -457,6 +421,7 @@ def main():
     plt.legend()
     plt.grid(True)
     plt.show()
+
     # Evaluate the best model on the test set
     test_acc = evaluate(model, zero_train_matrix, test_data)
     print(
