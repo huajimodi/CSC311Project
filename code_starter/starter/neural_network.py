@@ -83,56 +83,6 @@ class AutoEncoder(nn.Module):
 
 
 def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
-    """Train the neural network, where the objective also includes
-    a regularizer.
-
-    :param model: Module
-    :param lr: float
-    :param lamb: float
-    :param train_data: 2D FloatTensor
-    :param zero_train_data: 2D FloatTensor
-    :param valid_data: Dict
-    :param num_epoch: int
-    :return: None
-    """
-    model.train()
-
-    # Define optimizers and loss function.
-    optimizer = optim.SGD(model.parameters(), lr=lr)
-    num_student = train_data.shape[0]
-
-    for epoch in range(0, num_epoch):
-        train_loss = 0.0
-
-        for user_id in range(num_student):
-            inputs = zero_train_data[user_id].unsqueeze(0)
-            target = inputs.clone()
-
-            optimizer.zero_grad()
-            output = model(inputs)
-
-            # Mask the target to only compute the gradient of valid entries.
-            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
-            target[nan_mask] = output[nan_mask]
-
-            loss = torch.sum((output - target) ** 2.0)  # + lamb * regular
-            loss.backward()
-
-            train_loss += loss.item()
-            optimizer.step()
-
-        valid_acc = evaluate(model, zero_train_data, valid_data)
-        print(
-            "Epoch: {} \tTraining Cost: {:.6f}\t " "Valid Acc: {}".format(
-                epoch, train_loss, valid_acc
-            )
-        )
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
-
-
-def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     """Train the neural network, where the objective also includes a regularizer.
 
     :param model: Module
@@ -265,12 +215,12 @@ def main():
         # Initialize the model
         model = AutoEncoder(num_questions, i)
         training_losses, validation_losses, training_accuracies, validation_accuracies = (
-            train_s(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
+            train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
         )
 
         # Next, evaluate your network on validation/test data
         valid_acc = evaluate(model, zero_train_matrix, valid_data)
-        print(f"Validation Accuracy for k={i}, lambda={lamb}: {valid_acc:.4f}")
+        print(f"Validation Accuracy for k={i}, lambda={lamb}: {valid_acc:.4f}\n")
 
         # Update the best hyperparameters if current model is better
         if valid_acc > best_valid_acc:

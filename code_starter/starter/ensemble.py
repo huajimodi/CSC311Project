@@ -1,11 +1,8 @@
-import random
-
 import numpy as np
 from torch.autograd import Variable
 import torch.utils.data
 import torch
 import torch.optim as optim
-import torch.nn as nn
 
 from neural_network import AutoEncoder
 from utils import (
@@ -31,15 +28,17 @@ def load_data(base_path="./data"):
     train_matrix = load_train_sparse(base_path).toarray()
     valid_data = load_valid_csv(base_path)
     test_data = load_public_test_csv(base_path)
-
     zero_train_matrix = train_matrix.copy()
+
     # Fill in the missing entries to 0.
     zero_train_matrix[np.isnan(train_matrix)] = 0
+
     # Change to Float Tensor for PyTorch.
     zero_train_matrix = torch.FloatTensor(zero_train_matrix)
     train_matrix = torch.FloatTensor(train_matrix)
 
     return zero_train_matrix, train_matrix, valid_data, test_data
+
 
 def bootstrap_data(data, num_bootstrap):
     num_data = data.shape[0]
@@ -66,6 +65,7 @@ def evaluate(model, train_data, valid_data):
         total += 1
     return correct / float(total)
 
+
 def aggregate_predictions(models, data):
     aggregated_output = torch.zeros(data.shape)
     for model in models:
@@ -88,7 +88,7 @@ def evaluate_aggregated(aggregated_output, data):
     return correct / float(total)
 
 
-def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+def train(model, lr, lamb, train_data, zero_train_data, num_epoch):
     # Define optimizers and loss function.
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
@@ -106,10 +106,9 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[nan_mask] = output[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.0)   + lamb * 0.5 * model.get_weight_norm()
+            loss = torch.sum((output - target) ** 2.0) + lamb * 0.5 * model.get_weight_norm()
             loss.backward()
             optimizer.step()
-
 
 
 def main():
@@ -127,7 +126,7 @@ def main():
         model = AutoEncoder(num_questions, k)
         bootstrap_train_data = train_matrix[indices]
         bootstrap_zero_train_data = zero_train_matrix[indices]
-        train(model, lr, lamb, bootstrap_train_data, bootstrap_zero_train_data, valid_data, num_epoch)
+        train(model, lr, lamb, bootstrap_train_data, bootstrap_zero_train_data, num_epoch)
         models.append(model)
 
     aggregated_output = aggregate_predictions(models, zero_train_matrix)
