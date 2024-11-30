@@ -1,16 +1,16 @@
 import numpy as np
+from matplotlib import pyplot as plt
 from torch.autograd import Variable
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
 import torch
-import matplotlib.pyplot as plt
 from utils import (
     load_valid_csv,
     load_public_test_csv,
     load_train_sparse,
 )
+
 
 def load_data(base_path="./data"):
     """Load the data in PyTorch Tensor.
@@ -95,8 +95,6 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-    regular = model.get_weight_norm()
-    # Tell PyTorch you are training the model.
     model.train()
 
     # Define optimizers and loss function.
@@ -117,7 +115,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[nan_mask] = output[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.0) #+ lamb * regular
+            loss = torch.sum((output - target) ** 2.0)  # + lamb * regular
             loss.backward()
 
             train_loss += loss.item()
@@ -133,9 +131,9 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     #                       END OF YOUR CODE                            #
     #####################################################################
 
+
 def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
-    """Train the neural network, where the objective also includes
-    a regularizer.
+    """Train the neural network, where the objective also includes a regularizer.
 
     :param model: Module
     :param lr: float
@@ -146,8 +144,6 @@ def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch)
     :param num_epoch: int
     :return: tuple of (training_losses, validation_losses, training_accuracies, validation_accuracies)
     """
-    regular = model.get_weight_norm()
-    # Tell PyTorch you are training the model.
     model.train()
 
     # Define optimizers and loss function.
@@ -178,7 +174,6 @@ def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch)
 
             loss = torch.sum((output - target) ** 2.0) + lamb / 2 * model.get_weight_norm()
             loss.backward()
-            
 
             train_loss += loss.item()
             optimizer.step()
@@ -215,6 +210,7 @@ def train_s(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch)
 
     return training_losses, validation_losses, training_accuracies, validation_accuracies
 
+
 def evaluate(model, train_data, valid_data):
     """Evaluate the valid_data on the current model.
 
@@ -224,7 +220,6 @@ def evaluate(model, train_data, valid_data):
     question_id: list, is_correct: list}
     :return: float
     """
-    # Tell PyTorch you are evaluating the model.
     model.eval()
 
     total = 0
@@ -249,8 +244,7 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    #k = [10,50,100,200,500]
-    k = [50]
+    k = [10, 50, 100, 200, 500]
     num_questions = zero_train_matrix.shape[1]
 
     # Set optimization hyperparameters.
@@ -262,13 +256,18 @@ def main():
     best_k = 0
     best_lamb = 0
     best_valid_acc = 0
-    
+    best_model = None
+    best_training_losses, best_validation_losses, best_training_accuracies, best_validation_accuracies = (
+        None, None, None, None
+    )
+
     for i in k:
-
-        #Initalize the model
+        # Initialize the model
         model = AutoEncoder(num_questions, i)
+        training_losses, validation_losses, training_accuracies, validation_accuracies = (
+            train_s(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
+        )
 
-        train_s(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
         # Next, evaluate your network on validation/test data
         valid_acc = evaluate(model, zero_train_matrix, valid_data)
         print(f"Validation Accuracy for k={i}, lambda={lamb}: {valid_acc:.4f}")
@@ -278,72 +277,65 @@ def main():
             best_valid_acc = valid_acc
             best_k = i
             best_lamb = lamb
+            best_model = model
+            best_training_losses = training_losses
+            best_validation_losses = validation_losses
+            best_training_accuracies = training_accuracies
+            best_validation_accuracies = validation_accuracies
 
-        # Part (d): Retrain the best model and record metrics for plotting
     print(
-        f"\nRetraining the best model with k*={best_k} and lambda*={best_lamb} for plotting metrics...")
+        f"\nThe best model has k*={best_k} and lambda*={best_lamb} for plotting metrics..."
+    )
 
-    # Initialize the best model
-    # best_model = AutoEncoder(num_question=num_questions, k=best_k)
+    # Plot training loss, validation loss, training accuracy, and validation accuracy over epochs
+    epochs = range(1, num_epoch + 1)
 
-    # Optionally, initialize weights (already done in AutoEncoder class)
-    # nn.init.xavier_uniform_(best_model.g.weight)
-    # nn.init.xavier_uniform_(best_model.h.weight)
+    plt.figure(figsize=(18, 10))
 
-    # Train the best model and record metrics
-    # training_losses, validation_losses, training_accuracies, validation_accuracies = train_s(best_model, lr, best_lamb,
-    #                                                train_matrix,
-    #                                                zero_train_matrix,
-    #                                                valid_data, num_epoch)
+    # Plot Training Loss
+    plt.subplot(2, 2, 1)
+    plt.plot(epochs, best_training_losses, label='Training Loss', color='blue')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss over Epochs')
+    plt.legend()
+    plt.grid(True)
 
-# Plot training loss, validation loss, training accuracy, and validation accuracy over epochs
-#     epochs = range(1, num_epoch + 1)
-#
-#     plt.figure(figsize=(18, 10))
-#
-#     # Plot Training Loss
-#     plt.subplot(2, 2, 1)
-#     plt.plot(epochs, training_losses, label='Training Loss', color='blue')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Loss')
-#     plt.title('Training Loss over Epochs')
-#     plt.legend()
-#     plt.grid(True)
-#
-#     # Plot Validation Loss
-#     plt.subplot(2, 2, 1)
-#     plt.plot(epochs, validation_losses, label='Validation Loss', color='red')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Loss')
-#     plt.title('Validation Loss over Epochs')
-#     plt.legend()
-#     plt.grid(True)
-#
-#     # Plot Training Accuracy
-#     plt.subplot(2, 2, 3)
-#     plt.plot(epochs, training_accuracies, label='Training Accuracy', color='orange')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Accuracy')
-#     plt.title('Training Accuracy over Epochs')
-#     plt.legend()
-#     plt.grid(True)
-#
-#     # Plot Validation Accuracy
-#     plt.subplot(2, 2, 3)
-#     plt.plot(epochs, validation_accuracies, label='Validation Accuracy', color='green')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Accuracy')
-#     plt.title('Validation Accuracy over Epochs')
-#     plt.legend()
-#     plt.grid(True)
-#
-#     plt.tight_layout()
-#     plt.show()
+    # Plot Validation Loss
+    plt.subplot(2, 2, 1)
+    plt.plot(epochs, best_validation_losses, label='Validation Loss', color='red')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Validation Loss over Epochs')
+    plt.legend()
+    plt.grid(True)
+
+    # Plot Training Accuracy
+    plt.subplot(2, 2, 3)
+    plt.plot(epochs, best_training_accuracies, label='Training Accuracy', color='orange')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Training Accuracy over Epochs')
+    plt.legend()
+    plt.grid(True)
+
+    # Plot Validation Accuracy
+    plt.subplot(2, 2, 3)
+    plt.plot(epochs, best_validation_accuracies, label='Validation Accuracy', color='green')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Validation Accuracy over Epochs')
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.show()
 
     # Evaluate the best model on the test set
-    test_acc = evaluate(model, zero_train_matrix, test_data)
+    test_acc = evaluate(best_model, zero_train_matrix, test_data)
     print(
-        f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lamb}): {test_acc:.4f}")
+        f"\nFinal Test Accuracy for the best model (k*={best_k}, lambda*={best_lamb}): {test_acc:.4f}"
+    )
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################

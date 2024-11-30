@@ -41,7 +41,6 @@ def knn_impute_by_item(matrix, valid_data, k):
     :return: float
     """
     #####################################################################
-    # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
     nbrs = KNNImputer(n_neighbors=k)
@@ -64,7 +63,6 @@ def main():
     print(sparse_matrix.shape)
 
     #####################################################################
-    # TODO:                                                             #
     # Compute the validation accuracy for each k. Then pick k* with     #
     # the best performance and report the test accuracy with the        #
     # chosen k*.                                                        #
@@ -102,8 +100,6 @@ def main():
 
     print(f"Test accuracy with {strategy} k={best_k}: {test_accuracy:.4f}")
 
-
-
     # # User based graph
     # plt.figure(figsize=(10, 6))
     # plt.plot(k_values, valid_acc_user, label='User-based Imputation')
@@ -125,7 +121,7 @@ def main():
     # plt.grid(True)
     # plt.show()
     # plt.savefig('knn_imputation.png')
-    #
+
     plt.figure(figsize=(10, 6))
     plt.plot(k_values, valid_acc_user, label='User-based Imputation')
     plt.plot(k_values, valid_acc_item, label='Item-based Imputation')
@@ -136,7 +132,6 @@ def main():
     plt.grid(True)
     plt.show()
     plt.savefig('knn_imputation.png')
-
 
     #####################################################################
     #                       END OF YOUR CODE                            #

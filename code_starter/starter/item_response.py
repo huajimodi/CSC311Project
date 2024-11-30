@@ -1,16 +1,15 @@
 import random
 
-from nltk import log_likelihood
-
-from code_starter.starter.neural_network import train
 from utils import (
     load_train_csv,
     load_valid_csv,
     load_public_test_csv,
     load_train_sparse,
 )
+
 import numpy as np
 import matplotlib.pyplot as plt
+
 
 def sigmoid(x):
     """Apply sigmoid function."""
@@ -102,7 +101,6 @@ def irt(data, val_data, lr, iterations):
         theta, beta = update_theta_beta(data, lr, theta, beta)
 
     log_likelihoods = {"train": train_llds, "val": val_llds}
-    # TODO: You may change the return values to achieve what you want.
     return theta, beta, val_acc_lst, log_likelihoods
 
 
@@ -131,9 +129,7 @@ def main():
     val_data = load_valid_csv("./data")
     test_data = load_public_test_csv("./data")
 
-
     #####################################################################
-    # TODO:                                                             #
     # Tune learning rate and number of iterations. With the implemented #
     # code, report the validation and test accuracy.                    #
     #####################################################################
@@ -153,15 +149,12 @@ def main():
         for iteration in iteration_counts:
             print(f"\nTraining with Learning Rate: {lr}, Iterations: {iteration}")
 
-
             theta, beta, val_acc_lst, log_likes = irt(train_data, val_data, lr, iteration)
-
 
             val_acc = evaluate(val_data, theta, beta)
             test_acc = evaluate(test_data, theta, beta)
 
             print(f"Validation Accuracy: {val_acc:.4f} | Test Accuracy: {test_acc:.4f}")
-
 
             if best_val_acc is None or val_acc > best_val_acc:
                 best_lr = lr
@@ -195,7 +188,6 @@ def main():
     #####################################################################
 
     #####################################################################
-    # TODO:                                                             #
     # Implement part (d)                                                #
     #####################################################################
 
