@@ -131,7 +131,6 @@ def main():
     plt.legend()
     plt.grid(True)
     plt.show()
-    plt.savefig('knn_imputation.png')
 
     #####################################################################
     #                       END OF YOUR CODE                            #
