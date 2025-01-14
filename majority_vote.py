@@ -17,7 +17,7 @@ def main():
     :return: None
     """
     # Load the train data.
-    train_data = load_train_csv("./data")
+    train_data = load_train_csv("data")
 
     correct_question_map = {}
     total_question_map = {}
@@ -34,7 +34,7 @@ def main():
             total_question_map[q] = 1
 
     # Load the validation data.
-    valid_data = load_valid_csv("./data")
+    valid_data = load_valid_csv("data")
     predictions = []
     for i, q in enumerate(valid_data["question_id"]):
         ratio = correct_question_map[q] / float(total_question_map[q])
@@ -49,7 +49,7 @@ def main():
     print("Validation Accuracy: {}".format(acc))
 
     # Load the public test data.
-    test_data = load_public_test_csv("./data")
+    test_data = load_public_test_csv("data")
     predictions = []
     for i, q in enumerate(test_data["question_id"]):
         ratio = correct_question_map[q] / float(total_question_map[q])
@@ -61,7 +61,7 @@ def main():
     print("Test Accuracy: {}".format(acc))
 
     # Load the private test dataset.
-    private_test = load_private_test_csv("./data")
+    private_test = load_private_test_csv("data")
     predictions = []
     for i, q in enumerate(private_test["question_id"]):
         ratio = correct_question_map[q] / float(total_question_map[q])

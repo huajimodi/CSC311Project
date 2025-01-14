@@ -121,10 +121,10 @@ def als(train_data, k, lr, num_iteration):
 
 
 def main():
-    train_matrix = load_train_sparse("./data").toarray()
-    train_data = load_train_csv("./data")
-    val_data = load_valid_csv("./data")
-    test_data = load_public_test_csv("./data")
+    train_matrix = load_train_sparse("data").toarray()
+    train_data = load_train_csv("data")
+    val_data = load_valid_csv("data")
+    test_data = load_public_test_csv("data")
 
     #####################################################################
     # TODO:                                                             #
