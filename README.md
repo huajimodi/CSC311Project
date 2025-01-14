@@ -10,7 +10,7 @@ Welcome to the **Extended Neural Network** project! This repository demonstrates
 3. [Methodology](#methodology)
     - [Data Preprocessing](#data-preprocessing)
     - [Autoencoder Architecture](#autoencoder-architecture)
-    - [Question Correlation Matrix $ C_Q $](#question-correlation-matrix--c_q-)
+    - [Question Correlation Matrix](#question-correlation-matrix--c_q-)
     - [K-Means Clustering for Imputation](#k-means-clustering-for-imputation)
     - [Training and Regularization](#training-and-regularization)
 4. [Implementation](#implementation)
@@ -30,7 +30,7 @@ Our dataset is extremely sparse: roughly $94\%$ of the student-question entries 
 
 **Contributions**  
 1. **Label Shifting**: We shift all incorrect answers from $0$ to $-1$, preserving $0$ explicitly for *missing* entries only. This helps the model differentiate truly incorrect answers ($-1$) from simply missing data ($0$).  
-2. **Question Correlation Matrix**: We generate a matrix $ C_Q $ that captures how similar or correlated two questions are, based on their subject metadata (via TF-IDF).  
+2. **Question Correlation Matrix**: We generate a matrix $C_Q$ that captures how similar or correlated two questions are, based on their subject metadata (via TF-IDF).  
 3. **K-Means Clustering**: For each question cluster, we estimate a student's missing responses using a simple majority-voting (mean-based) approach within that cluster.  
 4. **Extended Autoencoder**: Our base autoencoder is enhanced by plugging in these more meaningful imputed values and by incorporating an additional regularization term.
 
@@ -43,12 +43,12 @@ Our dataset is extremely sparse: roughly $94\%$ of the student-question entries 
    - Learns a compressed ($k$-dimensional) representation of student responses and reconstructs the input vector.
 
 2. **Imputation via Question Similarity**  
-   - Subject correlation matrix $ C_S $ built using TF-IDF on subject names.  
-   - Question correlation matrix $ C_Q = A C_S A^{T}$, where $ A $ is the question-subject assignment matrix.  
-   - Normalizing $ C_Q $ ensures question similarities lie between $0$ and $1$.
+   - Subject correlation matrix $C_S$ built using TF-IDF on subject names.  
+   - Question correlation matrix $C_Q = A C_S A^{T}$, where $ A $ is the question-subject assignment matrix.  
+   - Normalizing $C_Q$ ensures question similarities lie between $0$ and $1$.
 
 3. **K-Means**  
-   - We cluster questions into $ k_{\text{means}} $ groups based on $ C_Q^{\text{normalized}} $.  
+   - We cluster questions into $k_{\text{means}}$ groups based on $C_Q^{\text{normalized}}$.  
    - Missing responses for each student are filled using a mean-based decision from the questions in the same cluster.
 
 4. **Regularization**  
@@ -70,32 +70,32 @@ Our dataset is extremely sparse: roughly $94\%$ of the student-question entries 
 ### Autoencoder Architecture
 
 We use a simple autoencoder comprising:
-- **Encoder**: $ \mathbf{z} = \sigma \bigl(W_1 \cdot \mathbf{x} \bigr) $  
-- **Decoder**: $ \hat{\mathbf{x}} = \sigma \bigl(W_2 \cdot \mathbf{z} \bigr) $  
+- **Encoder**: $\mathbf{z} = \sigma \bigl(W_1 \cdot \mathbf{x} \bigr)$  
+- **Decoder**: $\hat{\mathbf{x}} = \sigma \bigl(W_2 \cdot \mathbf{z} \bigr)$  
 
 where $\sigma$ is the elementwise sigmoid function, and $\mathbf{x} \in \mathbb{R}^Q$ is the vector of a single student’s responses across all questions.
 
 ### Question Correlation Matrix $ C_Q $
 
 Given:
-- **Question-Subject Assignment Matrix** $ A \in \mathbb{R}^{Q \times S} $, with $ A_{q,s} = 1 $ if question $ q $ is linked to subject $ s $, else $0$.  
-- **Subject Correlation Matrix** $ C_S \in \mathbb{R}^{S \times S} $ computed via TF-IDF similarity on subject names.  
+- **Question-Subject Assignment Matrix** $A \in \mathbb{R}^{Q \times S}$, with $A_{q,s} = 1$ if question $q$ is linked to subject $s$, else $0$.  
+- **Subject Correlation Matrix** $C_S \in \mathbb{R}^{S \times S}$ computed via TF-IDF similarity on subject names.  
 
 We define:
 
-$$
-C_Q \;=\; A \, C_S \, A^T 
-$$
-We then normalize $ C_Q $ so that its diagonal entries are $1$, ensuring all similarity scores lie in $[0,1]$.
+![Equation](https://latex.codecogs.com/svg.latex?C_Q%20%3D%20A%20C_S%20A^T)
+
+We then normalize $C_Q$ so that its diagonal entries are $1$, ensuring all similarity scores lie in $[0,1]$.
 
 ### K-Means Clustering for Imputation
 
 To impute missing entries:
 
 1. **Clustering**:  
-   $$
-   \{\mathcal{C}_1, \dots, \mathcal{C}_K\} \;=\; \text{K-Means}\bigl(C_Q^{\text{normalized}}, k_{\text{means}}\bigr)
-   $$
+```math
+\{\mathcal{C}_1, \mathcal{C}_2, \ldots, \mathcal{C}_K\} = \text{K-Means}(C_Q^{\text{normalized}}, K)
+```
+
    Each question is assigned to one cluster $\mathcal{C}_k$.
 
 2. **Missing Entry Imputation**:  
@@ -109,15 +109,11 @@ To impute missing entries:
 
 **Loss Function**  
 We minimize the **reconstruction loss** (sum of squared errors) plus a **weight-decay** term:  
-$$
-\mathcal{L}(\theta) \;=\; 
-\sum_{m=1}^{N} 
-\bigl\| \hat{\mathbf{x}}_m - \mathbf{x}_m \bigr\|^2 
-\;+\; \frac{\lambda}{2} \Bigl(\| W_1 \|_F^2 + \| W_2 \|_F^2 \Bigr).
-$$
-We use **Stochastic Gradient Descent (SGD)** with a chosen learning rate (e.g., $\text{lr} = 0.005$) and run for $\text{num\_epoch} = 80$ epochs.
+```math
+\mathcal{L}(\theta)\;=\;\sum_{m=1}^{N}\bigl\|\hat{\mathbf{x}}_m-\mathbf{x}_m\bigr\|^2\;+\;\frac{\lambda}{2}\Bigl(\|W_1\|_F^2+\|W_2\|_F^2\Bigr)
+```
+We use **Stochastic Gradient Descent (SGD)** with a chosen learning rate (e.g., `lr = 0.005`) and run for `num_epoch = 80` epochs.
 
----
 
 ## Implementation
 
@@ -150,17 +146,17 @@ class AutoEncoder(nn.Module):
 
 - **File**: `extended_nn.py` (or similar)  
 - **Purpose**: Improves data preprocessing by:
-  1. **Computing** the question correlation matrix $ C_Q $ via TF-IDF-based subject similarity $ C_S $.  
+  1. **Computing** the question correlation matrix $C_Q$ via TF-IDF-based subject similarity $C_S$.  
   2. **Clustering** questions with K-Means ($k_{\text{means}}=14$ by default).  
   3. **Imputing** missing entries in $\mathbf{X}$ based on cluster membership.  
   4. **Training** the same autoencoder architecture but on the updated training matrix with a possible extra correlation-based regularization term.
 
 **Steps**:
 1. `get_correlation_matrix(...)`  
-   - Loads subject metadata and computes $ C_S $ via `cosine_similarity` on TF-IDF.  
-   - Returns $ C_Q^{\text{normalized}} $.  
+   - Loads subject metadata and computes $C_S$ via `cosine_similarity` on TF-IDF.  
+   - Returns $C_Q^{\text{normalized}}$.  
 2. `load_data(k_mean=14, ...)`  
-   - Reads the question metadata, subject meta, and merges them via an assignment matrix $ A $.  
+   - Reads the question metadata, subject meta, and merges them via an assignment matrix $A$.  
    - Applies `KMeans` to cluster questions.  
    - Imputes student responses.  
 3. `AutoEncoder` remains structurally the same.  
@@ -203,7 +199,9 @@ reg_term = torch.trace(
 
 - **Extended Model Accuracy**: With our cluster-based imputation + label shifting + correlation-based regularization, we achieve a **test accuracy of ~0.6997**, outperforming the base neural network variants.  
 - **Visualizations**:  
-  - A subset of the correlation matrix $ C_Q^{\text{normalized}} $ can be plotted (e.g., 20 questions).  
+  - A subset of the correlation matrix $C_Q^{\text{normalized}}$ can be plotted (e.g., 20 questions).
+    ![question_correlation_matrix](https://github.com/user-attachments/assets/9524f76b-0ff9-4e4b-a360-b5c19d10305c)
+
   - Training vs. validation accuracy curves help diagnose overfitting or underfitting.
 
 **Comparative Table**  
